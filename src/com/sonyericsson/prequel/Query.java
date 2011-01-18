@@ -24,8 +24,39 @@
  */
 package com.sonyericsson.prequel;
 
-interface Query {
+public class Query {
 
-    Table execute();
+    private Database origin;
+
+    private String sql;
+
+    Query(Database origin, String sql) {
+	this.origin = origin;
+	this.sql = sql;
+    }
+
+    /**
+     * Runs a previously compiled SQL-query using the given parameters.
+     * 
+     * @param params
+     *            Zero or more objects that will be bound to parameters in the
+     *            SQL-query. The order will be the same as given here.
+     * 
+     * @return The result of the query as a
+     *         {@link com.sonyericsson.prequel.Table} . The contents of the
+     *         table depends on the query e.g. INSERT, UPDATE and DELETE returns
+     *         the number of affected rows, while SELECT returns the actual
+     *         search result. Some queries produces no return values and the
+     *         resulting table is therefore empty.
+     * @throws InvalidSqlQueryException
+     */
+    public Table run(Object... params) throws InvalidSqlQueryException {
+	return origin.exec(sql, params);
+    }
+
+    @Override
+    public String toString() {
+	return sql;
+    }
 
 }

@@ -133,7 +133,7 @@ public class TestFreeForAll extends TestCase {
 	for (String s : makeCreateTableStmt().generate()) {
 	    System.out.println(s);
 	    try {
-		d.query(s);
+		d.prepare(s).run();
 	    } catch (InvalidSqlQueryException e) {
 		// TODO: Need to split the exception so that a special exception
 		// is thrown when a computation failed, as opposed to the actual

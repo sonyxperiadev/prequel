@@ -26,9 +26,10 @@ package com.sonyericsson.prequel;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Iterator;
 import java.util.Vector;
 
-public class Table {
+public class Table implements Iterable<Object> {
 
     private static final String NULL_TEXT = "NULL";
 
@@ -75,11 +76,47 @@ public class Table {
 
     }
 
+    private class RowIterator implements Iterator<Object> {
+
+	private Object next;
+
+	private Iterator<Row> pos;
+
+	RowIterator() {
+	    pos = rows.iterator();
+	    next();
+	}
+
+	@Override
+	public boolean hasNext() {
+	    return next != null;
+	}
+
+	@Override
+	public Object next() {
+	    Object obj = next;
+	    while (pos.hasNext()) {
+		next = pos.next();
+		if (next instanceof ObjectRow) {
+		    break;
+		}
+	    }
+	    return obj;
+	}
+
+	@Override
+	public void remove() {
+	    throw new UnsupportedOperationException();
+	}
+
+    }
+
     @SuppressWarnings("serial")
     private static class VectorRow extends Vector<Object> implements Row {
 
 	public VectorRow(int size) {
 	    super(size);
+	    setSize(size);
 	}
 
 	@Override
@@ -96,7 +133,7 @@ public class Table {
 
     class ObjectRow implements Row {
 
-	private Object o;
+	Object o;
 
 	public ObjectRow(Object obj) {
 	    o = obj;
@@ -502,10 +539,6 @@ public class Table {
 	return (getCellInt(row, column) == 1);
     }
 
-    public Object getRowObject(int row) {
-	return null;
-    }
-
     @Override
     public String toString() {
 	int[] maxWidth = new int[columns.size()];
@@ -572,6 +605,11 @@ public class Table {
 	}
 	b.append("+\n");
 	return b.toString();
+    }
+
+    @Override
+    public Iterator<Object> iterator() {
+	return new RowIterator();
     }
 
 }
