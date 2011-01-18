@@ -1210,8 +1210,33 @@ public class Database {
 	}
     }
 
-    void clearBindings() {
-	bindings.clear();
+    Table exec(String sql, Object... params) throws InvalidSqlQueryException {
+	synchronized (lock) {
+	    if (dropped) {
+		throw new IllegalStateException(
+			"Cannot perform query on a dropped database");
+	    } else {
+		Table result = null;
+		tokenizer = new Tokenizer(sql);
+		for (int i = 0; i < params.length; i++) {
+		    bind(i, params[i]);
+		}
+		try {
+		    result = parseSql();
+		    // TODO: A Query should be returned, which is then executed!
+		} catch (ParsingException e) {
+		    // e.printStackTrace();
+		    throw new InvalidSqlQueryException(e.getMessage() + " at "
+			    + e.getPos() + ": " + sql.substring(0, e.getPos())
+			    + "<<here>>" + sql.substring(e.getPos()));
+		} catch (ProcessingException e) {
+		    throw new InvalidSqlQueryException(e.getMessage() + ": "
+			    + sql);
+		}
+		ensureEnd();
+		return result;
+	    }
+	}
     }
 
     /**
@@ -1249,61 +1274,26 @@ public class Database {
 
 	/* Create default tables */
 	try {
-	    query("CREATE TABLE sqlite_stat1 (contacts TEXT, idx TEXT, tbl TEXT, stat TEXT)");
+	    prepare(
+		    "CREATE TABLE sqlite_stat1 (contacts TEXT, idx TEXT, tbl TEXT, stat TEXT)")
+		    .run();
 	} catch (InvalidSqlQueryException e) {
 	    System.out.println(e);
 	    internalError();
 	}
     }
 
-    // TODO public void link(String table, Collection rows)
-
     /**
-     * Executes an SQL-query on the database.
-     * 
-     * TODO: Describe how to use object rows!
+     * Prepares an SQL-query for later use on this database. Note that the
+     * parameters are not given in this call, but is instead used when the query
+     * is actually executed using {Query#exec(Object...)}.
      * 
      * @param sql
      *            A valid query in SQLite-syntax.
-     * @param params
-     *            Zero or more objects that will be bound to parameters in the
-     *            SQL-query. The order will be the same as given here.
-     * @return The result of the query as a
-     *         {@link com.sonyericsson.prequel.Table} . The contents of the
-     *         table depends on the query e.g. INSERT, UPDATE and DELETE returns
-     *         the number of affected rows, while SELECT returns the actual
-     *         search result. Some queries produces no return values and the
-     *         resulting table is therefore empty.
+     * @see Query#run(Object...)
      */
-    public Table query(String sql, Object... params)
-	    throws InvalidSqlQueryException {
-	synchronized (lock) {
-	    if (dropped) {
-		throw new IllegalStateException(
-			"Cannot perform query on a dropped database");
-	    } else {
-		Table result = null;
-		tokenizer = new Tokenizer(sql);
-		for (int i = 0; i < params.length; i++) {
-		    bind(i, params[i]);
-		}
-		try {
-		    result = parseSql();
-		    // TODO: A Query should be returned, which is then executed!
-		} catch (ParsingException e) {
-		    // e.printStackTrace();
-		    throw new InvalidSqlQueryException(e.getMessage() + " at "
-			    + e.getPos() + ": " + sql.substring(0, e.getPos())
-			    + "<<here>>" + sql.substring(e.getPos()));
-		} catch (ProcessingException e) {
-		    throw new InvalidSqlQueryException(e.getMessage() + ": "
-			    + sql);
-		}
-		ensureEnd();
-		clearBindings();
-		return result;
-	    }
-	}
+    public Query prepare(String sql) throws InvalidSqlQueryException {
+	return new Query(this, sql);
     }
 
     @Override
