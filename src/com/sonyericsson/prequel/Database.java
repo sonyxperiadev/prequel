@@ -30,11 +30,11 @@ import java.util.Vector;
 
 public class Database {
 
-    private Table EMPTY_TABLE = new Table(this);
+    private final Table EMPTY_TABLE = new Table(this);
 
-    private Object lock = new Object();
+    private final Object lock = new Object();
 
-    private boolean dropped;
+    private final boolean dropped;
 
     private Database session;
 
@@ -42,16 +42,16 @@ public class Database {
 
     private long userVersion;
 
-    private Hashtable<String, Table> tables;
+    private final Hashtable<String, Table> tables;
 
     private int lastBinding;
 
-    private Hashtable<Integer, Object> bindings;
+    private final Hashtable<Integer, Object> bindings;
 
     @SuppressWarnings("serial")
     private static class ParsingException extends Exception {
 
-	private int pos;
+	private final int pos;
 
 	public ParsingException(String reason, int pos) {
 	    super(reason);
@@ -146,6 +146,16 @@ public class Database {
 	    }
 	}
 	return false;
+    }
+
+    /**
+     * TODO
+     * 
+     * @param id
+     * @return
+     */
+    private boolean lookAhead(String id) {
+	return lookAhead(new String[] { id });
     }
 
     /**
@@ -524,122 +534,114 @@ public class Database {
 	eat("(");
 	Table table = new Table(this);
 	do {
-	    if (eat("UNIQUE", true)) {
-		eat("(");
-		do {
-		    table.addUniquness(table.getColumnIndex(eat()));
-		} while (eat(",", true));
-		eat(")");
+	    String name = eat();
+	    Object defVal = null;
+
+	    /* Choose internal type */
+	    int type = -1;
+	    switch (eatFuzzy(new String[] { "INT", "CHAR", "CLOB", "TEXT",
+		    "BLOB", "REAL", "FLOA", "DOUB" })) {
+	    case 0:
+		type = Table.INTEGER;
+		break;
+	    case 1:
+	    case 2:
+	    case 3:
+		type = Table.TEXT;
+		break;
+	    case 4:
+		type = Table.NONE;
+		break;
+	    case 5:
+	    case 6:
+	    case 7:
+		type = Table.REAL;
+		break;
+	    default:
 		break;
 	    }
-	    int constraint = eat(new String[] { "PRIMARY", "UNIQUE" }, true);
-	    if (constraint != -1) {
-		switch (constraint) {
-		case 0:
-		    eat("KEY");
-		    /* Fall through */
-		case 1:
-		    eat("(");
-		    do {
-			String column = eat();
-		    } while (eat(",", true));
-		    eat(")");
-		    int action = parseConflictClause();
-		    break;
-		default:
-		    internalError();
+
+	    /* Accept repetition of type */
+	    if (type != -1) {
+		while (eat(tokenizer.current(), true)) {
 		}
-		break;
-	    } else {
-		String name = eat();
-		Object defVal = null;
+	    }
 
-		/*
-		 * NOTE: Be forgiving when it comes to repeating the column name
-		 * since it seems SQLite is as well.
-		 */
-		eat(name, true);
-
-		/* Choose internal type */
-		int type = -1;
-		switch (eatFuzzy(new String[] { "INT", "CHAR", "CLOB", "TEXT",
-			"BLOB", "REAL", "FLOA", "DOUB" })) {
-		case 0:
-		    type = Table.INTEGER;
-		    break;
-		case 1:
-		case 2:
-		case 3:
-		    type = Table.TEXT;
-		    if (eat("(", true)) {
+	    /* Handle size parameters on text type */
+	    if (type == Table.TEXT) {
+		if (eat("(", true)) {
+		    eatNumber();
+		    if (eat(",", true)) {
 			eatNumber();
-			eat(")", true);
 		    }
-		    break;
-		case 4:
-		    type = Table.NONE;
-		    break;
-		case 5:
-		case 6:
-		case 7:
-		    type = Table.REAL;
-		    break;
-		default:
-		    break;
+		    eat(")", true);
 		}
+	    }
 
-		boolean exit = false;
-		int flags = 0;
-		while (!exit) {
-		    int extra = eat(new String[] { "NOT", "PRIMARY", "UNIQUE",
-			    "DEFAULT", "REFERENCES", "COLLATE" }, true);
-		    if (type == -1 && extra == -1) {
-			if (!lookAhead(new String[] { ",", ")" })) {
-			    eat();
-			    type = Table.NUMERIC;
-			}
+	    boolean exit = false;
+	    int flags = 0;
+	    while (!exit) {
+		int extra = eat(new String[] { "NOT", "PRIMARY", "UNIQUE",
+			"DEFAULT", "REFERENCES", "COLLATE" }, true);
+		if (type == -1 && extra == -1) {
+		    if (!lookAhead(new String[] { ",", ")" })) {
+			eat();
+			type = Table.NUMERIC;
 		    }
-		    switch (extra) {
+		}
+		switch (extra) {
+		case 0:
+		    eat("NULL");
+		    flags |= Table.NOT_NULL;
+		    break;
+		case 1:
+		    eat("KEY");
+		    flags |= Table.PRIMARY_KEY;
+		    switch (eat(new String[] { "ASC", "DESC" }, true)) {
 		    case 0:
-			eat("NULL");
-			flags |= Table.NOT_NULL;
+			flags |= Table.ASCENDING;
 			break;
 		    case 1:
-			eat("KEY");
-			flags |= Table.PRIMARY_KEY;
-			if (eat("AUTOINCREMENT", true)) {
-			    flags |= Table.AUTO_INCREMENT;
-			}
-			break;
-		    case 2:
-			int resolution = parseConflictClause();
-			break;
-		    case 3:
-			defVal = parseExpression().evaluate(null, -1);
-			break;
-		    case 4:
-			String refTbl = eat();
-			if (eat("(", true)) {
-			    Vector<String> refCols = new Vector<String>();
-			    do {
-				refCols.add(eat());
-			    } while (eat(",", true));
-			    eat(")");
-			}
-			break;
-		    case 5:
-			int collation = parseCollation();
+			flags |= Table.DESCENDING;
 			break;
 		    default:
-			exit = true;
 			break;
 		    }
+		    if (lookAhead("ON")) {
+			int action = parseConflictClause();
+		    }
+		    if (eat("AUTOINCREMENT", true)) {
+			flags |= Table.AUTO_INCREMENT;
+		    }
+		    break;
+		case 2:
+		    int resolution = parseConflictClause();
+		    break;
+		case 3:
+		    defVal = parseExpression().evaluate(null, -1);
+		    break;
+		case 4:
+		    String refTbl = eat();
+		    if (eat("(", true)) {
+			Vector<String> refCols = new Vector<String>();
+			do {
+			    refCols.add(eat());
+			} while (eat(",", true));
+			eat(")");
+		    }
+		    break;
+		case 5:
+		    int collation = parseCollation();
+		    break;
+		default:
+		    exit = true;
+		    break;
 		}
-		if (type == -1) {
-		    type = Table.NONE;
-		}
-		table.addColumn(name, Math.max(0, type | flags), defVal);
 	    }
+	    if (type == -1) {
+		type = Table.NONE;
+	    }
+	    table.addColumn(name, Math.max(0, type | flags), defVal);
 	} while (eat(",", true));
 	eat(")");
 
@@ -767,7 +769,7 @@ public class Database {
 
     private void parseCreate() throws ParsingException, ProcessingException {
 	switch (eat(new String[] { "TABLE", "TRIGGER", "INDEX", "UNIQUE",
-		"VIEW" }, false)) {
+		"VIEW", "TEMP", "TEMPORARY" }, false)) {
 	case 0:
 	    parseCreateTable();
 	    break;
@@ -783,6 +785,11 @@ public class Database {
 	    break;
 	case 4:
 	    parseCreateView();
+	    break;
+	case 5:
+	case 6:
+	    eat("TABLE");
+	    parseCreateTable();
 	    break;
 	default:
 	    internalError();
