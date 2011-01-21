@@ -27,6 +27,8 @@ package com.sonyericsson.prequel;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Vector;
 
 public class Table {
@@ -577,25 +579,17 @@ public class Table {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T[] getRows(Class<T> clazz) {
-	T[] temp = (T[]) Array.newInstance(clazz, rows.size());
-	int len = 0;
+    public <T> Iterator<T> getRows(Class<T> clazz) {
+	ArrayList<T> temp = new ArrayList<T>(rows.size());
 	for (Row row : rows) {
 	    if (row instanceof ObjectRow) {
 		Object o = ((ObjectRow) row).o;
 		if (clazz.isInstance(o)) {
-		    temp[len++] = (T) o;
+		    temp.add((T) o);
 		}
 	    }
 	}
-	final T[] result;
-	if (temp.length == len) {
-	    result = temp;
-	} else {
-	    result = (T[]) Array.newInstance(clazz, len);
-	    System.arraycopy(temp, 0, result, 0, len);
-	}
-	return result;
+	return temp.iterator();
     }
 
 }
