@@ -28,7 +28,6 @@ import junit.framework.TestCase;
 
 import com.sonyericsson.prequel.Database;
 import com.sonyericsson.prequel.InvalidSqlQueryException;
-import com.sonyericsson.prequel.Query;
 import com.sonyericsson.prequel.Table;
 
 public class TestCreate extends TestCase {
@@ -41,27 +40,31 @@ public class TestCreate extends TestCase {
     }
 
     public void testReturnValue() throws InvalidSqlQueryException {
-	Table t = d.prepare("CREATE TABLE test_table (a);").run();
+	Table t = d.query("CREATE TABLE test_table (a);");
 	assertNotNull(t);
 	assertTrue(t.isEmpty());
     }
 
     public void testSeveralColumns() throws InvalidSqlQueryException {
 	Table t = d
-		.prepare(
-			"CREATE TABLE test_table (ax123, b, cx123456789, d, ex1, fx123456789, gx1, h);")
-		.run();
+		.query("CREATE TABLE test_table (ax123, b, cx123456789, d, ex1, fx123456789, gx1, h);");
 	assertNotNull(t);
 	assertTrue(t.isEmpty());
     }
 
     public void testDifferentColumnTypes() throws InvalidSqlQueryException {
 	Table t = d
-		.prepare(
-			"CREATE TABLE test_table (ax123 INTEGER, b, cx123456789 VARCHAR(123), d BLOB, ex1 NUMERIC, fx123456789 REAL, gx1 FLOAT, h TEXT);")
-		.run();
+		.query("CREATE TABLE test_table (ax123 INTEGER, b, cx123456789 VARCHAR(123), d BLOB, ex1 NUMERIC, fx123456789 REAL, gx1 FLOAT, h TEXT);");
 	assertNotNull(t);
 	assertTrue(t.isEmpty());
+    }
+
+    public void test() throws InvalidSqlQueryException {
+	Database d = new Database();
+	d.query("CREATE TABLE bank (name TEXT, money INTEGER)");
+	d.query("INSERT INTO bank VALUES ('Donald Duck', 100)");
+	d.query("INSERT INTO bank VALUES ('Scrooge McDuck', 1000000)");
+	System.out.println(d.query("SELECT * FROM bank WHERE money > 500"));
     }
 
 }
