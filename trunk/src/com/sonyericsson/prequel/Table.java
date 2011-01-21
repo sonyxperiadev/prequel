@@ -33,11 +33,15 @@ public class Table implements Iterable<Object> {
 
     private static final String NULL_TEXT = "NULL";
 
-    final static int NOT_NULL = 0x100;
+    final static int NOT_NULL = 0x0100;
 
-    final static int PRIMARY_KEY = 0x200;
+    final static int PRIMARY_KEY = 0x0200;
 
-    final static int AUTO_INCREMENT = 0x400;
+    final static int AUTO_INCREMENT = 0x0400;
+
+    final static int ASCENDING = 0x0800;
+
+    final static int DESCENDING = 0x1000;
 
     final static int TYPE_MASK = 0xff;
 
@@ -51,9 +55,9 @@ public class Table implements Iterable<Object> {
 
     final static int NUMERIC = 0x04;
 
-    private Vector<Row> rows;
+    private final Vector<Row> rows;
 
-    private Database parent;
+    private final Database parent;
 
     Vector<Object> defVals;
 
@@ -80,7 +84,7 @@ public class Table implements Iterable<Object> {
 
 	private Object next;
 
-	private Iterator<Row> pos;
+	private final Iterator<Row> pos;
 
 	RowIterator() {
 	    pos = rows.iterator();
