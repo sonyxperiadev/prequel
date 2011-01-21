@@ -24,12 +24,12 @@
  */
 package com.sonyericsson.prequel;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Iterator;
 import java.util.Vector;
 
-public class Table implements Iterable<Object> {
+public class Table {
 
     private static final String NULL_TEXT = "NULL";
 
@@ -55,9 +55,9 @@ public class Table implements Iterable<Object> {
 
     final static int NUMERIC = 0x04;
 
-    private final Vector<Row> rows;
+    private Vector<Row> rows;
 
-    private final Database parent;
+    private Database parent;
 
     Vector<Object> defVals;
 
@@ -77,41 +77,6 @@ public class Table implements Iterable<Object> {
 	void addColumn(Object defVal);
 
 	Row makeCopy();
-
-    }
-
-    private class RowIterator implements Iterator<Object> {
-
-	private Object next;
-
-	private final Iterator<Row> pos;
-
-	RowIterator() {
-	    pos = rows.iterator();
-	    next();
-	}
-
-	@Override
-	public boolean hasNext() {
-	    return next != null;
-	}
-
-	@Override
-	public Object next() {
-	    Object obj = next;
-	    while (pos.hasNext()) {
-		next = pos.next();
-		if (next instanceof ObjectRow) {
-		    break;
-		}
-	    }
-	    return obj;
-	}
-
-	@Override
-	public void remove() {
-	    throw new UnsupportedOperationException();
-	}
 
     }
 
@@ -310,7 +275,7 @@ public class Table implements Iterable<Object> {
 		.set(column, convert(value, flags.get(column) & TYPE_MASK));
     }
 
-    Vector<Integer> getRows(Expression where) {
+    Vector<Integer> getRowsWhere(Expression where) {
 	Vector<Integer> result = new Vector<Integer>();
 	for (int i = 0; i < rows.size(); i++) {
 	    if (where == null || ((Integer) where.evaluate(this, i)) == 1) {
@@ -359,7 +324,7 @@ public class Table implements Iterable<Object> {
 	    for (int i = 0; i < getColumnCount(); i++) {
 		sub.addColumn(getColumnName(i), getFlags(i), getDefVal(i));
 	    }
-	    for (int row : getRows(where)) {
+	    for (int row : getRowsWhere(where)) {
 		sub.rows.add(rows.get(row).makeCopy());
 	    }
 	} else {
@@ -372,7 +337,7 @@ public class Table implements Iterable<Object> {
 
 	    /* Evaluate all cells */
 	    int y = 0;
-	    for (int row : getRows(where)) {
+	    for (int row : getRowsWhere(where)) {
 		int x = 0;
 		for (Expression column : columns) {
 		    sub.set(y, x, column.evaluate(this, row));
@@ -393,7 +358,7 @@ public class Table implements Iterable<Object> {
 	}
 
 	/* Add rows from other table */
-	for (int row : other.getRows(null)) {
+	for (int row : other.getRowsWhere(null)) {
 	    if (allowDuplicates || indexOf(other, row) == -1) {
 		copyRow(other, row);
 	    }
@@ -611,9 +576,26 @@ public class Table implements Iterable<Object> {
 	return b.toString();
     }
 
-    @Override
-    public Iterator<Object> iterator() {
-	return new RowIterator();
+    @SuppressWarnings("unchecked")
+    public <T> T[] getRows(Class<T> clazz) {
+	T[] temp = (T[]) Array.newInstance(clazz, rows.size());
+	int len = 0;
+	for (Row row : rows) {
+	    if (row instanceof ObjectRow) {
+		Object o = ((ObjectRow) row).o;
+		if (clazz.isInstance(o)) {
+		    temp[len++] = (T) o;
+		}
+	    }
+	}
+	final T[] result;
+	if (temp.length == len) {
+	    result = temp;
+	} else {
+	    result = (T[]) Array.newInstance(clazz, len);
+	    System.arraycopy(temp, 0, result, 0, len);
+	}
+	return result;
     }
 
 }
