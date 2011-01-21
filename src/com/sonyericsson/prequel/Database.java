@@ -30,7 +30,7 @@ import java.util.Vector;
 
 public class Database {
 
-    private final Table EMPTY_TABLE = new Table(this);
+    private Table EMPTY_TABLE = new Table(this);
 
     private final Object lock = new Object();
 
@@ -874,16 +874,21 @@ public class Database {
 	}
 	eat("INTO");
 	String id = eat();
-	eat("(");
-	Vector<String> columns = new Vector<String>();
-	do {
-	    columns.add(forceIdentifier(eat()));
-	} while (eat(",", true));
-	eat(")");
+	final Vector<String> columns = new Vector<String>();
+	Table table = getTableSafe(id);
+	if (eat("(", true)) {
+	    do {
+		columns.add(forceIdentifier(eat()));
+	    } while (eat(",", true));
+	    eat(")");
+	} else {
+	    for (int i = 0; i < table.getColumnCount(); i++) {
+		columns.add(table.getColumnName(i));
+	    }
+	}
 	eat("VALUES");
 	eat("(");
 	Vector<Object> values = new Vector<Object>();
-	Table table = getTableSafe(id);
 	do {
 	    if (values.size() == columns.size()) {
 		throw new ProcessingException("More values than columns");
@@ -1217,35 +1222,6 @@ public class Database {
 	}
     }
 
-    Table exec(String sql, Object... params) throws InvalidSqlQueryException {
-	synchronized (lock) {
-	    if (dropped) {
-		throw new IllegalStateException(
-			"Cannot perform query on a dropped database");
-	    } else {
-		Table result = null;
-		tokenizer = new Tokenizer(sql);
-		for (int i = 0; i < params.length; i++) {
-		    bind(i, params[i]);
-		}
-		try {
-		    result = parseSql();
-		    // TODO: A Query should be returned, which is then executed!
-		} catch (ParsingException e) {
-		    // e.printStackTrace();
-		    throw new InvalidSqlQueryException(e.getMessage() + " at "
-			    + e.getPos() + ": " + sql.substring(0, e.getPos())
-			    + "<<here>>" + sql.substring(e.getPos()));
-		} catch (ProcessingException e) {
-		    throw new InvalidSqlQueryException(e.getMessage() + ": "
-			    + sql);
-		}
-		ensureEnd();
-		return result;
-	    }
-	}
-    }
-
     /**
      * <p>
      * Gets the database with the given file-name. This is used when the
@@ -1281,9 +1257,7 @@ public class Database {
 
 	/* Create default tables */
 	try {
-	    prepare(
-		    "CREATE TABLE sqlite_stat1 (contacts TEXT, idx TEXT, tbl TEXT, stat TEXT)")
-		    .run();
+	    query("CREATE TABLE sqlite_stat1 (contacts TEXT, idx TEXT, tbl TEXT, stat TEXT)");
 	} catch (InvalidSqlQueryException e) {
 	    System.out.println(e);
 	    internalError();
@@ -1291,16 +1265,53 @@ public class Database {
     }
 
     /**
-     * Prepares an SQL-query for later use on this database. Note that the
-     * parameters are not given in this call, but is instead used when the query
-     * is actually executed using {Query#exec(Object...)}.
+     * Executes the given SQL-query.
      * 
      * @param sql
      *            A valid query in SQLite-syntax.
-     * @see Query#run(Object...)
+     * @param params
+     *            Zero or more objects that will be bound to parameters in the
+     *            SQL-query. The order will be the same as given here.
+     * 
+     * @return The result of the query as a
+     *         {@link com.sonyericsson.prequel.Table} . The contents of the
+     *         table depends on the query e.g. <code>INSERT</code>,
+     *         <code>UPDATE</code> and <code>DELETE</code> returns the number of
+     *         affected rows, while <code>SELECT</code> returns the actual
+     *         search result. Some queries produces no return values and the
+     *         resulting table is therefore empty.
+     * @throws InvalidSqlQueryException
      */
-    public Query prepare(String sql) throws InvalidSqlQueryException {
-	return new Query(this, sql);
+    public Table query(String sql, Object... params)
+	    throws InvalidSqlQueryException {
+	synchronized (lock) {
+	    if (dropped) {
+		throw new IllegalStateException(
+			"Cannot perform query on a dropped database");
+	    } else {
+		Table result = null;
+		tokenizer = new Tokenizer(sql);
+		for (int i = 0; i < params.length; i++) {
+		    bind(i, params[i]);
+		}
+		try {
+		    result = parseSql();
+		    // TODO: A Query should be returned, which is then executed!
+		    // To be able to cache.
+		} catch (ParsingException e) {
+		    // e.printStackTrace();
+		    throw new InvalidSqlQueryException(e.getMessage() + " at "
+			    + e.getPos() + ": " + sql.substring(0, e.getPos())
+			    + "<<here>>" + sql.substring(e.getPos()));
+		} catch (ProcessingException e) {
+		    throw new InvalidSqlQueryException(e.getMessage() + ": "
+			    + sql);
+		}
+		ensureEnd();
+		return result;
+	    }
+	}
+
     }
 
     @Override

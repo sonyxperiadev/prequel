@@ -39,13 +39,19 @@ public class TestFreeForAll extends TestCase {
 
     private Database d;
 
+    private interface PermutationListener {
+
+	void onPermutation(String query);
+
+    }
+
     private abstract static class Step {
 
 	private int recursionCount;
 
 	protected final Vector<Step> next;
 
-	protected void generate(Stack<Step> path, Vector<String> result) {
+	protected void generate(Stack<Step> path, PermutationListener listener) {
 	    if (path.contains(this)) {
 		if (recursionCount == RECURSION_DEPTH - 1) {
 		    return;
@@ -58,10 +64,10 @@ public class TestFreeForAll extends TestCase {
 		for (Step step : path) {
 		    sb.append(step.out());
 		}
-		result.add(sb.toString());
+		listener.onPermutation(sb.toString());
 	    } else {
 		for (Step step : next) {
-		    step.generate(path, result);
+		    step.generate(path, listener);
 		}
 	    }
 	    path.pop();
@@ -86,11 +92,8 @@ public class TestFreeForAll extends TestCase {
 	    return s;
 	}
 
-	public String[] generate() {
-	    Vector<String> result = new Vector<String>();
-	    generate(new Stack<Step>(), result);
-	    String[] s = new String[result.size()];
-	    return result.toArray(s);
+	public void generate(PermutationListener listener) {
+	    generate(new Stack<Step>(), listener);
 	}
 
     }
@@ -223,7 +226,7 @@ public class TestFreeForAll extends TestCase {
     }
 
     private Step makeColumnDef() {
-	Step name = new Text("column_name#"); // TODO: # replaced by level later
+	Step name = new Text("column_name"); // TODO: # replaced by level later
 	Step type = makeTypeName();
 	Step constraint = makeColumnContraint();
 
@@ -269,17 +272,24 @@ public class TestFreeForAll extends TestCase {
     }
 
     public void testCreateParsing() throws InvalidSqlQueryException {
-	for (String s : makeCreateTableStmt().generate()) {
-	    System.out.println(s);
-	    try {
-		d.prepare(s).run();
-	    } catch (InvalidSqlQueryException e) {
-		System.out.println("****" + e.getMessage());
-		// TODO: Need to split the exception so that a special exception
-		// is thrown when a computation failed, as opposed to the actual
-		// parsing, e.g. not finding a table is not a parsing error.
+	makeCreateTableStmt().generate(new PermutationListener() {
+
+	    @Override
+	    public void onPermutation(String query) {
+		System.out.println(query);
+		try {
+		    d.query(query);
+		} catch (InvalidSqlQueryException e) {
+		    System.out.println("****" + e.getMessage());
+		    // TODO: Need to split the exception so that a special
+		    // exception
+		    // is thrown when a computation failed, as opposed to the
+		    // actual
+		    // parsing, e.g. not finding a table is not a parsing error.
+		}
 	    }
-	}
+
+	});
     }
 
 }
