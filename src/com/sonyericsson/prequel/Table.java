@@ -24,7 +24,6 @@
  */
 package com.sonyericsson.prequel;
 
-import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -219,7 +218,11 @@ public class Table {
 	    } else if (o instanceof Double) {
 		return convert(((Double) o).intValue(), type);
 	    } else if (o instanceof String) {
-		return convert(Long.valueOf((String) o), type);
+		try {
+		    return convert(Long.valueOf((String) o), type);
+		} catch (NumberFormatException e) {
+		    return 0;
+		}
 	    } else {
 		return 0;
 	    }
@@ -508,6 +511,17 @@ public class Table {
 
     public boolean getCellBoolean(int row, int column) {
 	return (getCellInt(row, column) == 1);
+    }
+
+    public Class<?> getColumnClass(int column) {
+	switch (flags.get(column) & TYPE_MASK) {
+	case INTEGER:
+	    return Integer.class;
+	case TEXT:
+	    return String.class;
+	default:
+	    return Object.class;
+	}
     }
 
     @Override

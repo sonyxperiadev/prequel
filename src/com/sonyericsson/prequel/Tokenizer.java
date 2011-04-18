@@ -77,7 +77,7 @@ class Tokenizer {
 	    if (currentChar() == EOL) {
 		current = null;
 	    } else {
-		if (",;()?:@$|&*%".indexOf(currentChar()) != -1) {
+		if (",;()?:@$|&*%+-".indexOf(currentChar()) != -1) {
 		    nextChar();
 		} else if (currentChar() == '!' || currentChar() == '='
 			|| currentChar() == '>' || currentChar() == '<') {
@@ -97,9 +97,6 @@ class Tokenizer {
 		    // separate database from table!
 		    while (Character.isJavaIdentifierPart(nextChar())
 			    || currentChar() == '.') {
-		    }
-		} else if (currentChar() == '-' || currentChar() == '+') {
-		    while (Character.isDigit(nextChar())) {
 		    }
 		} else if (Character.isDigit(currentChar())) {
 		    while (Character.isDigit(nextChar())) {

@@ -24,6 +24,7 @@
  */
 package com.sonyericsson.prequel;
 
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Vector;
@@ -533,28 +534,44 @@ public class Database {
 	String id = eat();
 	eat("(");
 	Table table = new Table(this);
+	int constraint;
 	do {
+	    /* Check for beginning of table constraints */
+	    constraint = eat(new String[] { "UNIQUE", "PRIMARY" }, true);
+	    if (constraint != -1) {
+		break;
+	    }
+
+	    /* Get the column name */
 	    String name = eat();
+
+	    /*
+	     * NOTE: Some bug seems to accept that we duplicate the name, so
+	     * this is legacy support.
+	     */
+	    eat(name, true);
+
 	    Object defVal = null;
 
 	    /* Choose internal type */
 	    int type = -1;
 	    switch (eatFuzzy(new String[] { "INT", "CHAR", "CLOB", "TEXT",
-		    "BLOB", "REAL", "FLOA", "DOUB" })) {
+		    "STRING", "BLOB", "REAL", "FLOA", "DOUB" })) {
 	    case 0:
 		type = Table.INTEGER;
 		break;
 	    case 1:
 	    case 2:
 	    case 3:
+	    case 4:
 		type = Table.TEXT;
 		break;
-	    case 4:
+	    case 5:
 		type = Table.NONE;
 		break;
-	    case 5:
 	    case 6:
 	    case 7:
+	    case 8:
 		type = Table.REAL;
 		break;
 	    default:
@@ -643,6 +660,28 @@ public class Database {
 	    }
 	    table.addColumn(name, Math.max(0, type | flags), defVal);
 	} while (eat(",", true));
+
+	/* Table constraints */
+	switch (constraint) {
+	case 0:
+	    eat("(");
+	    do {
+		String column = eat();
+	    } while (eat(",", true));
+	    eat(")", false);
+	    break;
+	case 1:
+	    eat("KEY");
+	    eat("(");
+	    do {
+		String column = eat();
+	    } while (eat(",", true));
+	    eat(")", false);
+	    int conflict = parseConflictClause();
+	    break;
+	default:
+	    break;
+	}
 	eat(")");
 
 	/*
@@ -1259,7 +1298,7 @@ public class Database {
 	try {
 	    query("CREATE TABLE sqlite_stat1 (contacts TEXT, idx TEXT, tbl TEXT, stat TEXT)");
 	} catch (InvalidSqlQueryException e) {
-	    System.out.println(e);
+	    // System.out.println(e);
 	    internalError();
 	}
     }
@@ -1284,6 +1323,10 @@ public class Database {
      */
     public Table query(String sql, Object... params)
 	    throws InvalidSqlQueryException {
+	// System.out.println("SQL: " + sql);
+	// for (Object o : params) {
+	// System.out.println("PARAM: " + o);
+	// }
 	synchronized (lock) {
 	    if (dropped) {
 		throw new IllegalStateException(
