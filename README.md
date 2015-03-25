@@ -1,3 +1,7 @@
+![logo](https://code.google.com/p/prequel/logo?cct=1295276832) prequel
+=======
+*An in-memory Java-only database supporting SQLite syntax*
+
 Introduction
 ------------
 
