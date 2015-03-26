@@ -1,4 +1,4 @@
-prequel
+Prequel
 =======
 An in-memory Java-only database supporting SQLite syntax.
 
