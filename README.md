@@ -1,6 +1,6 @@
-![logo](https://code.google.com/p/prequel/logo?cct=1295276832) prequel
+prequel
 =======
-*An in-memory Java-only database supporting SQLite syntax*
+An in-memory Java-only database supporting SQLite syntax.
 
 Introduction
 ------------
